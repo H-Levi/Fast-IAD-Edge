@@ -1,0 +1,63 @@
+{
+  "test_metrics": {
+    "threshold": -3.080462694168091,
+    "auroc": 0.9948519948519948,
+    "aupr": 0.9973632168754119,
+    "f1": 0.9863013698630136,
+    "precision": 1.0,
+    "recall": 0.972972972972973,
+    "ece": 0.1952840340865516
+  },
+  "best_epoch": 18,
+  "best_val_score": 0.9021031746031746,
+  "monitor": "val_aupr",
+  "selection_failed": false,
+  "collapsed": false,
+  "collapse_evidence": {
+    "collapsed": false,
+    "max_abs_gap": 7.594985900734955,
+    "median_abs_gap": 4.174903753568541,
+    "selected_gap": 4.2682040288763226,
+    "final_gap": 7.594985900734955,
+    "sign_consistency": 0.9310344827586207,
+    "d_prime": 2.388006875778436,
+    "n_epochs": 29,
+    "eps": 0.1,
+    "sign_min": 0.75,
+    "d_prime_min": 0.35,
+    "rule": "selected_epoch+scalefree",
+    "triggered": [],
+    "reason": "selected-epoch |gap| 4.2682, sign consistency 0.93, d' 2.388 -> separated"
+  },
+  "collapse_gap_eps": 0.1,
+  "augmentation": {
+    "scenario": "original",
+    "filters": [
+      {
+        "enabled": false
+      }
+    ],
+    "multiplier": 1,
+    "train_records_after_expansion": 221,
+    "train_anomalies_after_expansion": 10,
+    "enabled": false
+  },
+  "reliability_tier": "injected",
+  "caveats": [
+    "severe_imbalance"
+  ],
+  "reportable": true,
+  "image_size": 288,
+  "model": {
+    "backbone": "efficientnet",
+    "head": "deep",
+    "pooling": "avg",
+    "feat_dim": 1280,
+    "total_params": 4796541,
+    "trainable_params": 4796541,
+    "size_mb": 18.297351837158203,
+    "leaf_ops": 238,
+    "gmacs": "n/a (pip install fvcore)",
+    "macs_at_px": 288
+  }
+}

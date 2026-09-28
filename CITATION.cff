@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the thesis below."
+type: software
+title: "Code for: Efficient Supervised Anomaly Detection for Industrial Edge Deployment"
+authors:
+  - given-names: "Hailegabriel Dereje"
+    family-names: "Degefa"
+license: MIT
+repository-code: "https://github.com/H-Levi/Fast-IAD-Edge"
+preferred-citation:
+  type: thesis
+  thesis-type: "M.Sc. thesis"
+  title: "Efficient Supervised Anomaly Detection for Industrial Edge Deployment"
+  authors:
+    - given-names: "Hailegabriel Dereje"
+      family-names: "Degefa"
+  institution:
+    name: "Università degli Studi di Verona"
+  department: "Department of Computer Science"
+  year: 2026
+  month: 9

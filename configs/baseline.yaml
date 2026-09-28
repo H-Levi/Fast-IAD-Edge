@@ -1,0 +1,32 @@
+# BASELINE v1 — the frozen configuration every experiment is compared against.
+# Inherits configs/default.yaml; everything below is a DELIBERATE difference from it.
+# Reproduce all 27 categories with ONE command:
+#   python run_train.py --config configs/baseline.yaml run.datasets=[mvtec,visa] \
+#       run.categories=[all] paths.mvtec_root=... paths.visa_root=... paths.output_root=...
+# Evidence for each line is in THesis_litreature/FINDINGS_ledger.md.
+inherit: default.yaml
+
+data:
+  image_size: 288            # accuracy table resolution (Run 0 onward)
+  de_confound_frac: 0.5      # Arm F v2 swap: breaks the folder->label shortcut (F-L42/48/50);
+                             # carpet 0.3157 -> 0.9488. MVTec only; VisA untouched.
+  cache_decoded: true        # 2.3x faster, proven bit-identical through the real loader
+                             # (wood 0.9928 exact; data-wait 67% -> 22%)
+  per_category:
+    mvtec/toothbrush:        # 2 training defects collapse it (0.4583). 6 -> 0.7269 (F-L53).
+      anomaly_fraction: 0.2  # takes 12 defects out of test instead of 6 ...
+      val_share_mode: fixed  # ... and pins the share, because the adaptive search falls
+      injection_val_share: 0.5 # through to 0.65 and gives 4/8 instead of 6/6 (F-L43).
+                             # NOTE: toothbrush's test set is 30 images, not 36 -> UNPAIRED.
+
+augment:
+  enabled: true              # STATED EXPLICITLY. This block, not `augmentation`, is what the
+                             # transform builder reads (F-L55). Load-bearing: wood 0.9773 ->
+                             # 0.7967 without it (F-L56); free on VisA (F-L57). Transform-only,
+                             # no record multiplication. Same for every category.
+  horizontal_flip: 0.5
+  rotation_degrees: 15
+  color_jitter: {brightness: 0.2, contrast: 0.2, saturation: 0.2}
+
+augmentation:
+  enabled: false             # the designed scenario system. Never run; stays off.

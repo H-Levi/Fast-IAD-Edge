@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+runs/
+*.pt
+*.zip
+# never commit dataset images (MVTec AD / VisA licences)
+*.png
+*.jpg
+*.JPG

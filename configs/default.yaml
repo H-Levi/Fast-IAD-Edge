@@ -1,0 +1,285 @@
+# ============================================================================
+# SINGLE SOURCE OF TRUTH
+# Every hyperparameter lives here. Nothing is hard-coded in the Python files.
+# CLI flags override these values (see run_*.py). Anything you want to sweep,
+# you sweep from here or from the CLI, never by editing code.
+# ============================================================================
+
+# ---- reproducibility ----
+seed: 123              # single-run seed (legacy; still used by run_train's per-run seed)
+seeds: [123]           # legacy multi-seed list (superseded by the seeding: block below)
+
+# §1.3 two-tier seeding: scouting is never mistaken for a claim.
+seeding:
+  tier: exploration                 # exploration (1 seed, scouting) | claim (3 seeds, reportable)
+  exploration_seeds: [123]
+  claim_seeds: [123, 7, 2024]
+
+# §1.5 frozen protocol: identity + reporting granularity. The numeric locks
+# (val_split, anomaly_fraction, metrics, seeds) are READ from their real keys via
+# analysis/protocol.py — not duplicated here — so there is one source of truth.
+protocol:
+  name: fastiad-v1
+  reporting: per_category
+  # §1.5 justification for the injection_val_share lock (the value itself lives
+  # in data.injection_val_share; recorded here so the reason travels with runs):
+  injection_val_share_justification: >
+    Train anomalies are multiplied xN by augmentation, but val anomalies must stay
+    REAL — you cannot validate on synthetic. Real anomalies are therefore worth more
+    on the val side. 0.65 shifts the split toward val WITHOUT taking any additional
+    anomalies out of test, and is hard-capped by the defect-type coverage invariant
+    (every defect type keeps >=1 sample in train).
+device: cuda:0         # falls back to cpu automatically if no GPU
+
+# ---- where things live ----
+paths:
+  mvtec_root: /path/to/mvtec_ad   # EDIT ME
+  visa_root:  /path/to/visa      # EDIT ME
+  output_root: ./runs
+
+# ---- which datasets / categories / backbones a run touches ----
+# These let you run "whichever you want separately or together".
+# Use the literal string "all" to expand to every category of a dataset.
+run:
+  datasets:  [mvtec]                 # [mvtec], [visa], or [mvtec, visa]
+  categories: [all]                  # ["all"] or an explicit list e.g. [screw, capsule]
+  backbones: [efficientnet]          # subset of: efficientnet, mobilenet, squeezenet
+
+# ---- data pipeline ----
+data:
+  image_size: 224
+  visa_shot: highshot                # highshot | fewshot -> {visa_root}/split_csv/2cls_{shot}.csv
+  val_split: 0.2                     # raised from 0.1: VisA had only 6 val anomalies -> noisy selection
+  use_validation: true               # true = select on val (correct). false = leaky, for ablation only
+  num_workers: 4
+  transplant:                        # F-L124 defect transplant. OFF by default (records unchanged, bit-for-bit).
+    enabled: false                   # true: in the SCARCE regime only, top training defects up to target_defects with
+    target_defects: 48               # synthetic ones: a real TRAINING defect pasted through its mask onto a TRAINING
+    feather_radius: 2.0              # normal at the same position (data/transplant.py). 48 = VisA's count (fixed a priori).
+    placement: random                # random (v1, F-L124) | duplicate (F-L140: real defects repeated, no paste) | best_match (v2, F-L127: host whose ring around the donor's
+    ring_px: 8                       # mask best matches the donor's own ring; donors round-robin; threshold-free)
+    donor_rule: all                  # all (v1/v2) | inside_object (v3, F-L129: paste only defects whose mask stays inside
+                                     # the object — Otsu foreground, 4 px outline band, <= 10% overlap; others stay real, unpasted)
+  cache_decoded: false               # OFF by default. true = keep decoded, resized images
+                                     # in RAM instead of re-reading the PNG every epoch.
+                                     # MEASURED NEED: cable @288 spent 73% of its training
+                                     # wall clock WAITING for the dataloader (119s idle vs
+                                     # 44s compute) -- four workers cannot decode 1024x1024
+                                     # PNGs fast enough to keep a T4 fed, and every epoch
+                                     # re-decodes the same files.
+                                     # SAFE: the cache sits AFTER resize and BEFORE filters,
+                                     # augmentation, ToTensor and Normalize, so all of those
+                                     # still run fresh -- random augmentation stays random.
+                                     # Proved bit-identical to the uncached path on 1024x1024,
+                                     # 900x700, 1600x1200 and 288x288 sources. Keyed by
+                                     # (path, size); cleared between categories; 3 GB ceiling
+                                     # after which it serves without storing.
+  num_train_anomalies: 0             # MVTec only, fixed k PER DEFECT TYPE. 0 => normals-only (flagged by stats.py)
+  anomaly_fraction: 0.1              # §2.3 LOCKED (from census drain): MVTec injects ceil(0.1*available) per defect type
+  test_anomaly_floor: 15             # PROVISIONAL: unvalidated heuristic. test anomalies < this -> AUROC noisy
+  floors_validated: false            # false -> the floors are placeholders; anything solved against them inherits that
+  val_anomaly_floor: 10              # PROVISIONAL: unvalidated heuristic (see floors_validated).
+                                     # Measurable in principle: subsample a val-rich category to k
+                                     # anomalies, repeat, and record how much the SELECTED EPOCH and
+                                     # val metric move; the k where that variance flattens is the
+                                     # empirical floor. Unlike val_share, this CAN be measured,
+                                     # because it measures selection stability rather than comparing
+                                     # two different val sets.
+  val_share_mode: adaptive           # adaptive | fixed. adaptive = take from train ONLY until the val
+                                     # floor is met, then stop (preserves within-type train diversity).
+  val_share_min: 0.5                 # lower bound of the adaptive search
+  injection_val_share: 0.65          # fixed mode: the share. adaptive mode: the UPPER bound.
+                                     # Raised from 0.5: train anomalies are multiplied xN by augmentation,
+                                     # but val anomalies must stay REAL, so real ones are worth more on the
+                                     # val side. HARD-CAPPED by the defect-type coverage invariant: every
+                                     # defect type keeps >=1 sample in train no matter what is requested.
+                                     # Does NOT change how many anomalies are taken from test.
+
+  # ---- ARM F: break the folder -> label shortcut (F-L42 / F-L48 / F-L49) ----
+  # MVTec ships a normal-only train split, so supervised protocols move DEFECTS out of
+  # test/ and leave NORMALS in train/good. Provenance then predicts the label perfectly in
+  # train and val. MEASURED COST: carpet's test AUROC inverts to 0.3157, and the inversion
+  # is ABSENT on untrained ImageNet features -- so training manufactured it, the data did
+  # not. Inherited from the canonical protocol (UM-068 / DevNet 2021), which has no
+  # validation split at all; 15 of 17 supervised MVTec papers in the library never state
+  # how anomalies reached training.
+  de_confound_frac: 0.0             # 0.0 = OFF (Run 0 behaviour, bit-identical).
+                                    # 0.5 = Arm F. It is a SWAP, not a transfer:
+                                    #   k test/good  -> train + val  (2:1)
+                                    #   k train/good -> test
+                                    # so test size AND prevalence are unchanged, and every
+                                    # split's normals span both acquisition sessions.
+                                    # v1 transferred without replacing, deleted 43% of
+                                    # MVTec's test normals, pushed prevalence up everywhere
+                                    # and cost 6 categories >0.025 AUROC -- see F-L50.
+                                    # k is capped so a category keeps >=3/4 of its train
+                                    # normals. Sampled AFTER the defect draw, so injected
+                                    # defects are unchanged and replication stays valid.
+  test_normal_floor: 15             # retained for the census/profiler warnings. The swap
+                                    # cannot take a category below it -- test size is fixed.
+  per_category: {}                  # "dataset/category": {data key: value} merged over `data`
+                                    # for that category only. Unknown keys are REJECTED.
+                                    # The baseline uses it for toothbrush (configs/baseline.yaml).
+
+# ---- FILTERS: manipulable preprocessing pipeline ----
+# Applied AFTER resize, BEFORE tensor/normalize, to BOTH train and test
+# (filters are part of the input representation, not augmentation).
+# Order matters: filters run top to bottom. Every filter is parameterized.
+# Set enabled: false to bypass the whole bank with zero overhead.
+filters:
+  enabled: false
+  pipeline:
+    # --- examples, all currently commented; uncomment / reorder to manipulate ---
+    # - {name: clahe,        clip_limit: 2.0, tile_grid: 8}
+    # - {name: unsharp_mask, radius: 2.0, percent: 150, threshold: 3}
+    # - {name: high_pass,    sigma: 3.0, strength: 1.0}
+    # - {name: sobel,        weight: 1.0, keep_original: true}
+    # - {name: laplacian,    weight: 1.0, keep_original: true}
+    # - {name: gaussian_blur,sigma: 1.0}
+    # - {name: median,       size: 3}
+    # - {name: gamma,        gamma: 1.2}
+    # - {name: contrast,     factor: 1.3}
+    # - {name: sharpen,      factor: 2.0}
+
+# ---- §4 augmentation save-set (TRAIN ONLY; default OFF = baseline unchanged) ----
+# NOT the augmentation that runs. This block has never been enabled in any reported run.
+# The ACTIVE train augmentation is the `augment:` block below (read by utils/transforms.py).
+# Every run's stage.jsonl records the real ops as `train_transform_ops` (F-L55).
+augmentation:
+  enabled: false                     # master switch. false -> scenario is forced to 'original'
+  scenario: original                 # original|cutpaste|geometry|appearance|noise_on_normals|combined|oversample|asymmetric
+  target_effective_anomalies: 30     # §4.1.2 sweep result; drives the derived multiplier
+  target_validated: false            # false -> every derived N is PROVISIONAL (sweep not yet run)
+  multiplier_cap: 10                 # stops a 3-anomaly category being duplicated 20x
+  cutpaste_ratio: 1.0                # synthetic anomalies added, as a multiple of real anomaly count
+  allow_destructive: false           # §3.7: heavy_blur/strong_jitter/large_crop/cutout are EXCLUDED by default
+  use_pipeline_config: false         # false -> named scenarios (§4.2). true -> the explicit p/range pipelines below
+
+  # §3.7 two-layer model. BASE is always on when augmentation is enabled;
+  # TARGETED add-ons are summoned only with the mechanism they train.
+  # Every knob is {p: <probability>, <range params>} so it is measurable via §1.4.
+  base:
+    normal_pipeline:                 # label stays NORMAL
+      hflip:      {p: 0.5}
+      rotate:     {p: 0.5, degrees: 10}
+      translate:  {p: 0.3, range: 0.05}
+      brightness: {p: 0.3, range: 0.15}
+      contrast:   {p: 0.3, range: 0.15}
+      glint_noise: {p: 0.0}           # OFF by default; ON via targeted.glint_on_normals
+    anomaly_pipeline:                # GEOMETRY ONLY — enforced, not advisory
+      hflip:      {p: 0.5}
+      rotate:     {p: 0.5, degrees: 10}
+      translate:  {p: 0.3, range: 0.05}
+  targeted:                          # each add-on trains ONE mechanism; vary one at a time
+    edge_artifacts:   {enabled: false}   # attention (§3.1)
+    fine_local_noise: {enabled: false}   # multi-scale (§3.2)
+    glint_on_normals: {enabled: false}   # filter / noise-vs-defect (§3.4)
+  per_category_overrides:            # PRINCIPLED ONLY (orientation/symmetry), never score-tuned
+    screw:      {hflip: {p: 0.0}}
+    transistor: {hflip: {p: 0.0}}
+    metal_nut:  {hflip: {p: 0.0}}
+    pcb1:       {hflip: {p: 0.0}}
+    pcb2:       {hflip: {p: 0.0}}
+    pcb3:       {hflip: {p: 0.0}}
+    pcb4:       {hflip: {p: 0.0}}
+    macaroni1:  {hflip: {p: 0.0}}
+    macaroni2:  {hflip: {p: 0.0}}
+  synthetic:
+    generator: cutpaste              # cutpaste | blob_blend
+    p: 0.0                           # 0 = off; label becomes ANOMALY when used
+  census_path: null                  # path to census.json; null -> newest under paths.output_root
+  require_verification: true         # §4.1.4 gate: refuse to train on a scenario with no passing contact-sheet check
+
+# ---- training augmentation (train split only) -- THIS IS THE ONE THAT RUNS ----
+# Load-bearing on MVTec (wood 0.9773 -> 0.7967 without it, F-L56). Transform-only: no record
+# multiplication. Val and test get Resize/ToTensor/Normalize only.
+augment:
+  enabled: true
+  horizontal_flip: 0.5
+  rotation_degrees: 15
+  color_jitter: {brightness: 0.2, contrast: 0.2, saturation: 0.2}
+
+# ---- model ----
+model:
+  pretrained: true
+  dropout: 0.3
+  head: deep                         # deep | mlp | linear  (see models/heads.py)
+  score_mode: image                  # image | patch_topk (F-L122). image = pool the final feature map, score once
+                                     # (original path, bit-for-bit). patch_topk = the SAME head scores every cell of
+                                     # the final map; the image logit is the mean of the top ceil(frac x cells)
+                                     # cell logits (DevNet-style top-K MIL, UM-068). Same parameters; head runs 81x.
+  patch_topk_frac: 0.1               # DevNet's recommended K (10% of cells); fixed a priori, never tuned per category
+  pooling: avg                       # avg | max | avgmax | attention | gem | lse  (E1)
+                                     # The conv stack emits a 7x7 = 49-cell grid at 224 px.
+                                     # 'avg' gives every cell an equal vote, so a one-cell
+                                     # defect contributes ~1/49 of the feature vector — the
+                                     # opposite of PatchCore's "one anomalous patch is
+                                     # enough". 'max' takes the strongest cell. 'avgmax'
+                                     # concatenates both (head input becomes 2C).
+                                     # 'attention' learns the weights and is ZERO-INIT, so
+                                     # it starts numerically identical to avg.
+                                     # Default 'avg' leaves the baseline bit-for-bit
+                                     # unchanged. Cost: analysis/benchmark.py --pooling <k>
+                                     # 'lse' is the smooth avg<->max slider with a LEARNED
+                                     # exponent p (softplus, no clamp boundary). p->0 is mean,
+                                     # p->inf is max, so lse SUBSUMES a separate max arm --
+                                     # provided p can actually move. It could not until
+                                     # train.pool_lr_mult existed; see that key.
+                                     # 'gem' is superseded: 92%/71% of final-grid activations
+                                     # are negative on effnet/mobilenet, so GeM's clamp
+                                     # perturbs the feature by ~98% of its magnitude.
+                                     # NOT part of the protocol fingerprint (model.* is the
+                                     # change under test), so A/B across pooling is allowed.
+
+# ---- training loop ----
+train:
+  batch_size: 32
+  num_epochs: 50
+  learning_rate: 0.001
+  # Learning rate multiplier for the pooling module only. LSE's `p` is one scalar
+  # sharing a rate sized for 1.3M weights; at 1x it moved 0.992 -> 1.045 over a whole
+  # run, so learnable pooling was never actually tested. Set 1.0 to disable.
+  pool_lr_mult: 50.0
+  early_stopping: true
+  patience: 10
+  use_class_weights: true              # §2.3 default balance: class-weights ON, oversample OFF
+  allow_weights_with_oversample: false # §2.4: block double-correction. true = combine deliberately, tune as a pair
+  weight_multiplier: 1.0
+
+# ---- model selection & thresholding (always on val when use_validation=true) ----
+selection:
+  monitor: val_aupr                  # AUPR is far more stable than AUROC under heavy imbalance / few positives
+  threshold_strategy: youden         # youden | f1   (threshold chosen on val, applied to test)
+  tiebreak: val_loss                 # val_loss | none
+                                     # With ~10-12 val anomalies, val_aupr saturates at
+                                     # exactly 1.0000 and improvement is strict, so the
+                                     # checkpoint locked onto the FIRST epoch to tie and
+                                     # patience began immediately. Measured on the 3-seed
+                                     # baseline: mvtec/bottle and visa/pcb2 both hit 1.0000
+                                     # at epoch 9, tied through epoch 19, and kept epoch 9 —
+                                     # chosen by arrival order, not quality.
+                                     # val_loss (already computed every epoch, previously
+                                     # never used for selection) now breaks those ties.
+                                     # A tie-break updates the checkpoint but does NOT reset
+                                     # patience, so runs stop on the same schedule.
+                                     # 'none' restores the previous behaviour exactly.
+
+# ---- instrumentation: how much to record ----
+instrumentation:
+  level: epoch                       # epoch | batch  (batch is verbose; use only when dissecting)
+  capture_grad_norms: true           # per-layer grad norms each epoch
+  capture_activations: false         # per-layer activation stats (hooks) — heavy, off by default
+  capture_logit_hist: true           # logit distribution split by class
+  histogram_bins: 30
+  save_raw_scores: true              # dump per-sample scores+labels+paths for offline analysis
+  save_features: true                # ALSO dump the pooled embedding (1280-d effnet / 576-d
+                                     # mobilenet) for train_normal, val and test. ~2 MB per
+                                     # category. Without it every distribution-based method
+                                     # (Mahalanobis to the normal cloud, kNN, fusing a distance
+                                     # with the logit -- analysis/distribution_score.py) costs a
+                                     # 35-minute retrain instead of a second of arithmetic.
+  collapse_gap_eps: 0.1              # §1.2: run flagged 'collapsed' if max |anomaly_mean-normal_mean| < this (logit units)
+
+# ---- evaluation metrics ----
+eval:
+  metrics: [auroc, aupr, f1, precision, recall, ece]

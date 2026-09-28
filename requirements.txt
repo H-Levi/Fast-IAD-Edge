@@ -1,0 +1,11 @@
+# Versions of the final runs (Kaggle, NVIDIA T4): torch 2.10.0+cu128, torchvision 0.25.0, Python 3.12
+torch==2.10.0
+torchvision==0.25.0
+numpy
+scipy
+scikit-learn
+pandas
+pyyaml
+pillow
+tqdm
+# optional: fvcore (FLOP counts), opencv-python (optional filters)

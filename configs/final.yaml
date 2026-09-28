@@ -1,0 +1,19 @@
+# FINAL model of the thesis (MVTec AD and VisA, one configuration for both).
+# Inherits baseline.yaml; the lines below are the settings of all 45 final MVTec runs. The 36 VisA runs differ only in
+# de_confound_frac (0.5 there), which the VisA loader does not use; the regime rule gives VisA the same weight and calibration.
+#   python run_train.py --config configs/final.yaml run.datasets=[mvtec] run.categories=[carpet] run.seeds=[7] \
+#       paths.mvtec_root=/path/to/mvtec_ad paths.output_root=runs/final
+inherit: baseline.yaml
+train:
+  class_weight_mode: neg_over_pos   # rich categories (>= regime_min_defects training defects): weight N/P
+  regime_min_defects: 20            # regime rule: every MVTec category is "scarce", every VisA category "rich"
+data:
+  calib_n: 110                      # rich categories: 110 held-out training normals set the 5 % line
+  de_confound_frac: 0.0             # standard MVTec split (no normal-image swap)
+  transplant:
+    enabled: true                   # scarce categories only: top training defects up to 48 by pasting real defects
+    placement: best_match           # onto context-matched training normals (applied at 288 px, cache_decoded)
+eval:
+  tta: true                         # two views scored: identity + rotate 10 degrees, logits averaged
+instrumentation:
+  save_scores_per_epoch: true
