@@ -65,6 +65,17 @@ runs used an NVIDIA T4 on Kaggle, torch 2.10.0 (CUDA 12.8), Python 3.12.
   github.com/nelson1425/EfficientAD, KairosAD a clone of github.com/intelligolabs/KairosAD with MobileSAM installed.
 - `analysis/time_cpu_pipeline.py`: full-pipeline timing (decode, resize, model) on a CPU.
 
+## Verify this release against the thesis
+
+    bash scripts/verify_release.sh /path/to/mvtec_ad /path/to/visa      # NVIDIA T4, about 30-40 min, internet for two clones
+
+1. the automated checks; 2. six exact reruns at seed 7 — final MVTec model (carpet, screw), final VisA model (capsules, pcb4) and
+the standard-split baseline (carpet, screw) — each compared with the thesis's saved scores in `results/reference_runs/`: same
+images, same epochs, identical per-image scores (tolerance 1e-4 with identical alarm decisions if the torch version differs from
+2.10.0) and identical metrics (false alarms, recall, precision, ECE, AUROC, AUPR); 3. parameters and GFLOPs of ours, EfficientAD-S
+and KairosAD against the thesis (exact); 4. a same-session speed test: each model's best time within 15 % of the thesis's session
+and the same ranking. Every check was tested with a planted change that it must catch. The report is `verify_out/VERIFY_REPORT.txt`.
+
 ## Safeguards
 
 The results were protected by checks that each guard against one named failure. The leak check, split views, collapse detector,

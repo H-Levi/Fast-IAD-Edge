@@ -1,0 +1,10 @@
+{
+ "best_epoch": 9,
+ "epochs_ran": 13,
+ "pos_weight": 0.9572649598121643,
+ "transplant_applied": true,
+ "n_synthetic": 38,
+ "n_distinct_hosts": 32,
+ "original_commit": "2515f17",
+ "original_env": "Kaggle NVIDIA T4, torch 2.10.0+cu128"
+}

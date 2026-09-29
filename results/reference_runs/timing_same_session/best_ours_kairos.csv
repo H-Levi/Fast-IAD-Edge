@@ -1,0 +1,15 @@
+model,image_size,precision,status,params,size_mb,gmacs,ms_bs1,ms_bs1_std,img_per_s,peak_mem_mb,note
+ours:efficientnet/avg,288,fp32,ok,4796541,18.3,0.662,7.752,0.307,129.0,44.1,
+ours:efficientnet/avg,288,fp16,ok,4796541,18.3,,8.94,0.229,111.9,26.6,
+ours:efficientnet/avg+compile,288,fp32,ok,4796541,18.3,,5.237,0.559,191.0,37.1,
+ours:efficientnet/avg+compile,288,fp16,ok,4796541,18.3,,8.461,1.105,118.2,25.9,
+kairosad,288,fp32,ok,21277357,81.17,41.977,51.256,0.44,19.5,346.9,
+kairosad,288,fp16,ok,21277357,81.17,,24.139,0.218,41.4,179.8,
+kairosad+compile,288,fp32,ok,21277357,81.17,,41.088,0.577,24.3,242.9,
+kairosad+compile,288,fp16,ok,21277357,81.17,,16.422,0.164,60.9,127.5,
+ours:efficientnet/avg+full,288,fp32,ok,4796541,18.3,,2.256,0.117,443.3,19.5,
+ours:efficientnet/avg+full,288,fp16,ok,4796541,18.3,,1.663,0.067,601.2,9.8,
+ours:efficientnet/avg+full[x2],288,fp32,ok,4796541,18.3,,2.114,0.689,473.1,20.4,"batch 2 = one image, two views (time per image)"
+ours:efficientnet/avg+full[x2],288,fp16,ok,4796541,18.3,,1.497,0.427,668.2,10.3,"batch 2 = one image, two views (time per image)"
+kairosad+full,288,fp32,ok,21277357,81.17,,45.399,0.595,22.0,88.7,
+kairosad+full,288,fp16,ok,21277357,81.17,,16.906,0.315,59.2,46.1,

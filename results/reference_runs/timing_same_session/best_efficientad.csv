@@ -1,0 +1,7 @@
+model,image_size,precision,status,params,size_mb,gmacs,ms_bs1,ms_bs1_std,img_per_s,peak_mem_mb,note
+efficientad_s,256,fp32,ok,8057856,30.74,37.954,38.257,0.27,26.1,874.1,
+efficientad_s,256,fp16,ok,8057856,30.74,,7.889,0.15,126.8,58.5,
+efficientad_s+compile,256,fp32,ok,8057856,30.74,,21.142,0.491,47.3,77.5,
+efficientad_s+compile,256,fp16,ok,8057856,30.74,,5.82,0.209,171.8,47.2,
+efficientad_s+full,256,fp32,ok,8057856,30.74,,21.048,0.51,47.5,31.5,
+efficientad_s+full,256,fp16,ok,8057856,30.74,,5.713,0.241,175.0,16.6,
