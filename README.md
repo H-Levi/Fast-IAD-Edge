@@ -84,8 +84,8 @@ paste-versus-repeat control — reproduced every stored score exactly (differenc
 three models matched exactly; the two-view time (2.91–3.20 ms against 2.99) and the speed ratios against EfficientAD-S and KairosAD
 reproduced. Our ONE-view time did not: 2.38–2.57 ms in two new sessions against 1.66 ms in the thesis's session, so the one-view
 speed check FAILED its 15 % rule; the one-view time varies between sessions and is reported as a range (1.66–2.57 ms). On a CPU
-(two Kaggle sessions, fp32, batch 1) ours was 11–15 times faster than EfficientAD-S and 37–43 times faster than KairosAD; the second
-session missed the 20 % rule for the EfficientAD-S ratio (11.1 against 14.9), so the CPU advantage is given as a range.
+(three Kaggle sessions, fp32, batch 1) ours was 11–15 times faster than EfficientAD-S and 37–50 times faster than KairosAD; the new
+sessions missed the 20 % rule for the EfficientAD-S ratio (11.1 and 11.9 against 14.9), so the CPU advantage is given as a range.
 
 ## Safeguards
 
