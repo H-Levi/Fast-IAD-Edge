@@ -76,6 +76,15 @@ images, same epochs, identical per-image scores (tolerance 1e-4 with identical a
 and KairosAD against the thesis (exact); 4. a same-session speed test: each model's best time within 15 % of the thesis's session
 and the same ranking. Every check was tested with a planted change that it must catch. The report is `verify_out/VERIFY_REPORT.txt`.
 
+Further checks: `scripts/verify_extra.sh` (the paste-versus-repeat control, carpet seed 7, and a three-repeat speed diagnostic) and
+`scripts/verify_cpu.sh` (CPU speed of the three models: same ranking, each ratio within 20 % of the thesis's CPU session).
+
+**Our own verification (Kaggle T4, torch 2.10.0, commit 047e56c / 093318b):** all seven reruns — the six above plus the
+paste-versus-repeat control — reproduced every stored score exactly (difference 0) and every metric; parameters and GFLOPs of all
+three models matched exactly; the two-view time (2.91–3.20 ms against 2.99) and the speed ratios against EfficientAD-S and KairosAD
+reproduced. Our ONE-view time did not: 2.38–2.57 ms in two new sessions against 1.66 ms in the thesis's session, so the one-view
+speed check FAILED its 15 % rule; the one-view time varies between sessions and is reported as a range (1.66–2.57 ms).
+
 ## Safeguards
 
 The results were protected by checks that each guard against one named failure. The leak check, split views, collapse detector,

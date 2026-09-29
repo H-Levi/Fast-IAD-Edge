@@ -1,0 +1,3 @@
+model,image_size,precision,status,params,size_mb,gmacs,ms_bs1,ms_bs1_std,img_per_s,peak_mem_mb,note
+ours:efficientnet/avg,288,fp32,ok,4796541,18.3,n/a (pip install fvcore),52.546,10.395,19.0,nan,
+kairosad,288,fp32,ok,21277357,81.17,n/a (pip install fvcore),2246.722,288.203,0.4,nan,
